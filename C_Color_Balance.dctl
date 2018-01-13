@@ -1,0 +1,69 @@
+// 
+// Color Balance
+//
+
+__DEVICE__ float luminance(float3 in)
+{
+    const float max = _fmaxf(in.x, _fmaxf(in.y, in.z));
+    const float min = _fminf(in.x, _fminf(in.y, in.z));					
+    return (max + min)/2.0f;
+}								
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+    const int   sample = 32;   // Lower for more accuracy but worse performance.
+    const int   cellW  = 25;   // Defines the number if patches.
+    const int   cellH  = 20;   // Defines the height of the patches. 
+    const float zoom   = 1;    // Increase to zoom into the shadows.
+    const float panelW = (float) p_Width/cellW;
+    const float panelH = (float) p_Height/cellH;
+    
+    float R[25]   = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    float G[25]   = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    float B[25]   = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    float SUM[25] = {0.00001f,0.00001f,0.00001f,0.00001f,0.00001f,
+                     0.00001f,0.00001f,0.00001f,0.00001f,0.00001f,
+                     0.00001f,0.00001f,0.00001f,0.00001f,0.00001f,
+                     0.00001f,0.00001f,0.00001f,0.00001f,0.00001f,
+                     0.00001f,0.00001f,0.00001f,0.00001f,0.00001f};
+    
+    for (int i = 0; i < p_Height; i+=sample)
+        for (int j = 0; j < p_Width; j+=sample)
+        {
+           int idx = 0;
+           const float3 x = make_float3(_tex2D(p_TexR, j, i),
+                                        _tex2D(p_TexG, j, i),
+                                        _tex2D(p_TexB, j, i));
+           const float lum = luminance(x);
+           idx = (int) floorf(lum*zoom*cellW);
+           if (idx >= 0 && idx < cellW)
+           {
+              R[idx] += x.x;
+              G[idx] += x.y;
+              B[idx] += x.z;
+              SUM[idx] += 1;
+           }
+        }
+ 
+    if (p_Y < panelH*(cellH - 1.5f))  
+      return make_float3(_tex2D(p_TexR, p_X, p_Y),
+                         _tex2D(p_TexG, p_X, p_Y),
+                         _tex2D(p_TexB, p_X, p_Y));      
+    else 
+    {
+      int idx = (int) floorf(p_X / panelW);
+      if (p_Y < panelH*(cellH - 1))
+      {
+         float level = ((float) idx)/cellW/zoom + 0.022f/zoom;
+         return make_float3(level, level, level);
+      }
+      else
+        if (SUM[idx] >= 1)          
+          return make_float3(R[idx]/SUM[idx],G[idx]/SUM[idx],B[idx]/SUM[idx]);
+        else
+          if (p_Y % 2)
+              return make_float3(0.3,0.2,0.1);
+          else
+              return make_float3(0.1,0.2,0.3);
+    }  
+}
