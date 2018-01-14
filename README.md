@@ -4,7 +4,8 @@ DaVinci Resolve DCTL files
 A collection of DCTL files that may be useful.
 
 C_Color_Balance
-  Shows the color balance by luminance level. Shows stripes when a luminance level is absent.
+
+Shows the color balance by luminance level. Shows stripes when a luminance level is absent.
 
 Variables:
 
