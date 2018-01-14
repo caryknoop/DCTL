@@ -13,3 +13,4 @@ C_Color_Balance
     const int   PANEL_COUNT      = 20;      // Defines the number of horizontal panels (25 max or increase arrays)
     const int   PANEL_SPACING    = 20;      // The larger the number the smaller the height of the panels. 
     
+  ---
