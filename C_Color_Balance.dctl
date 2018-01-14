@@ -27,18 +27,18 @@ __DEVICE__ void acescc_t(float3 *p)
   p->x = xyz_rec709[0] * p->x + xyz_rec709[1] * p->y + xyz_rec709[2] * p->z;
   p->y = xyz_rec709[3] * p->x + xyz_rec709[4] * p->y + xyz_rec709[5] * p->z;
   p->z = xyz_rec709[6] * p->x + xyz_rec709[7] * p->y + xyz_rec709[8] * p->z;   
-  p->x = powf(_fmaxf(p->x,0.0f), 0.5f);
-  p->y = powf(_fmaxf(p->y,0.0f), 0.5f);
-  p->z = powf(_fmaxf(p->z,0.0f), 0.5f); 
+  p->x = _powf(_fmaxf(p->x,0.0f), 0.5f);
+  p->y = _powf(_fmaxf(p->y,0.0f), 0.5f);
+  p->z = _powf(_fmaxf(p->z,0.0f), 0.5f); 
 }								
 
 __DEVICE__ void acescc_t_inv(int aces, float3 *p)
 {
   if (aces)
   {
-    p->x = (log2f(p->x) + 9.72f) / 17.52f;
-    p->y = (log2f(p->y) + 9.72f) / 17.52f;
-    p->z = (log2f(p->z) + 9.72f) / 17.52f;
+    p->x = (_log2f(p->x) + 9.72f) / 17.52f;
+    p->y = (_log2f(p->y) + 9.72f) / 17.52f;
+    p->z = (_log2f(p->z) + 9.72f) / 17.52f;
   }
 }								
 
@@ -57,16 +57,17 @@ __DEVICE__ float luminance(float3 in)
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-    const int   COLOR_SPACE      = 0;       // Use 0 for Rec709, other color spaces not yet implemented.
-    const float ZOOM             = 1.0f;    // Increase to ZOOM into the shadows.
-    const int   SAMPLE           = 32;      // Lower for more accuracy, raise for better performance.
-    const int   PANEL_COUNT      = 20;      // Defines the number of horizontal panels (25 max or increase arrays)
-    const int   PANEL_SPACING    = 20;      // The larger the number the smaller the height of the panels. 
+    const int   COLOR_SPACE   = 0;     // Use 0 for Rec709, other color spaces not yet implemented.
+    const float ZOOM          = 1.0f;  // Increase to ZOOM into the shadows.
+    const int   SAMPLE        = 16;    // Lower for more accuracy, raise for better performance.
+    const int   PANEL_COUNT   = 20;    // Defines the number of horizontal panels (25 max or increase arrays)
+    const int   PANEL_SPACING = 20;    // The larger the number the smaller the height of the panels. 
 
+    const int   skip         = SAMPLE;
     const float panel_width  = (float) p_Width/PANEL_COUNT;
     const float panel_height = (float) p_Height/PANEL_SPACING;
     const float panel_zoom   = PANEL_COUNT/ZOOM;
-    
+        
     float R[25]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
                      0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
                      0.0f,0.0f,0.0f,0.0f,0.0f};
@@ -78,8 +79,8 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
                      0.0f,0.0f,0.0f,0.0f,0.0f};
     int   SUM[25] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     
-    for (int i = 0; i < p_Width; i+=SAMPLE)
-        for (int j = 0; j < p_Height; j+=SAMPLE)
+    for (int i = 0; i < p_Width; i+=skip)
+        for (int j = 0; j < p_Height; j+=skip)
         {
            float3 x = make_float3(_tex2D(p_TexR, i, j),
                                   _tex2D(p_TexG, i, j),
