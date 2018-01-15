@@ -5,12 +5,11 @@ A collection of DCTL files that may be useful.
 
 # C_Color_Balance
 
-Shows the color balance by luminance level as a horizontal stoke on the bottom of the screen. Shows alternating stripes when a luminance level is absent.
+Shows the color balance by perceptual luminance level as a horizontal stoke on the bottom of the screen. Shows alternating stripes when a particulat luminance level is absent.
 
 Variables:
 
 ```
-COLOR_SPACE               = 0;    // Use 0 for Rec709, other color spaces not yet implemented.
 const float ZOOM          = 1.0f; // Increase to ZOOM into the shadows.
 const int   SAMPLE        = 32;   // Lower for more accuracy, raise for better performance.
 const int   PANEL_COUNT   = 20;   // Defines the number of horizontal panels (25 max or increase arrays)
