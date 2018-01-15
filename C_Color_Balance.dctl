@@ -1,102 +1,61 @@
 /* 
  Color Balance
 
- To do
-   - left and right panels
-   - volume indicators
-
+ Version 003
+ 
+ - Use perceptual luminance.
+ 
 ****************************************************************************************/
-// AP0 to XYZ
-__CONSTANT__ float ap0_xyz[9]    = { 0.9525523959f, 0.0000000000f, 0.0000936786f,
-                                     0.3439664498f, 0.7281660966f,-0.0721325464f,
-                                     0.0000000000f, 0.0000000000f, 1.0088251844f };
 
-// XYZ to REC709
-__CONSTANT__ float xyz_rec709[9] = { 3.2409699419f,-1.5373831776f,-0.4986107603f,
-                                    -0.9692436363f, 1.8759675015f, 0.0415550574f,
-                                     0.0556300797f -0.2039769589f, 1.0569715142f };
-
-__DEVICE__ void acescc_t(float3 *p)
-{  
-  p->x = ap0_xyz[0] * p->x + ap0_xyz[1] * p->y + ap0_xyz[2] * p->z;
-  p->y = ap0_xyz[3] * p->x + ap0_xyz[4] * p->y + ap0_xyz[5] * p->z;
-  p->z = ap0_xyz[6] * p->x + ap0_xyz[7] * p->y + ap0_xyz[8] * p->z;
-  p->x = expf(12.14393860f*p->x - 6.737390595f);
-  p->y = expf(12.14393860f*p->y - 6.737390595f);
-  p->z = expf(12.14393860f*p->z - 6.737390595f); 
-  p->x = xyz_rec709[0] * p->x + xyz_rec709[1] * p->y + xyz_rec709[2] * p->z;
-  p->y = xyz_rec709[3] * p->x + xyz_rec709[4] * p->y + xyz_rec709[5] * p->z;
-  p->z = xyz_rec709[6] * p->x + xyz_rec709[7] * p->y + xyz_rec709[8] * p->z;   
-  p->x = _powf(_fmaxf(p->x,0.0f), 0.5f);
-  p->y = _powf(_fmaxf(p->y,0.0f), 0.5f);
-  p->z = _powf(_fmaxf(p->z,0.0f), 0.5f); 
-}								
-
-__DEVICE__ void acescc_t_inv(int aces, float3 *p)
+__DEVICE__ float perceptual(float3 x)
 {
-  if (aces)
-  {
-    p->x = (_log2f(p->x) + 9.72f) / 17.52f;
-    p->y = (_log2f(p->y) + 9.72f) / 17.52f;
-    p->z = (_log2f(p->z) + 9.72f) / 17.52f;
-  }
-}								
+  x.x = x.x <= 0.081f ? x.x / 4.5f : _powf((x.x + 0.099f)/1.099f, 1.0f/0.45f);
+  x.y = x.y <= 0.081f ? x.y / 4.5f : _powf((x.y + 0.099f)/1.099f, 1.0f/0.45f);
+  x.z = x.z <= 0.081f ? x.z / 4.5f : _powf((x.z + 0.099f)/1.099f, 1.0f/0.45f);
 
-__DEVICE__ void transform(int aces, float3 *p)
-{
-  if(aces)
-    acescc_t(p);
-}								
-
-__DEVICE__ float luminance(float3 in)
-{
-  const float max = _fmaxf(in.x, _fmaxf(in.y, in.z));
-  const float min = _fminf(in.x, _fminf(in.y, in.z));					
-  return (max + min)/2.0f;
+  return x.x * 0.2126f + x.y * 0.7152f + x.z * 0.0722f;  
 }								
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-    const int   COLOR_SPACE   = 0;     // Use 0 for Rec709, other color spaces not yet implemented.
+    float R[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+    float G[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+    float B[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+    int   SUM[26] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
     const float ZOOM          = 1.0f;  // Increase to ZOOM into the shadows.
-    const int   SAMPLE        = 16;    // Lower for more accuracy, raise for better performance.
-    const int   PANEL_COUNT   = 20;    // Defines the number of horizontal panels (25 max or increase arrays)
+    const int   SAMPLE        = 32;    // Lower for more accuracy, raise for better performance.
+    const int   PANEL_COUNT   = 26;    // Defines the number of horizontal panels (25 max or increase arrays)
     const int   PANEL_SPACING = 20;    // The larger the number the smaller the height of the panels. 
 
     const int   skip         = SAMPLE;
+    const int   skip2        = SAMPLE /2;
     const float panel_width  = (float) p_Width/PANEL_COUNT;
     const float panel_height = (float) p_Height/PANEL_SPACING;
     const float panel_zoom   = PANEL_COUNT/ZOOM;
-        
-    float R[25]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f};
-    float G[25]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f};
-    float B[25]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f};
-    int   SUM[25] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     
     for (int i = 0; i < p_Width; i+=skip)
-        for (int j = 0; j < p_Height; j+=skip)
-        {
-           float3 x = make_float3(_tex2D(p_TexR, i, j),
-                                  _tex2D(p_TexG, i, j),
-                                  _tex2D(p_TexB, i, j));
-           float3 xt = x;
-           (void) transform(COLOR_SPACE, &xt);
-           const int idx = (int) floorf(luminance(xt)*PANEL_COUNT*ZOOM);
-           if (idx >= 0 && idx < PANEL_COUNT)
-           {
-              R[idx] += x.x;
-              G[idx] += x.y;
-              B[idx] += x.z;
-              SUM[idx] += 1;
-           }
-        }
-
+      for (int j = 0; j < p_Height; j+=skip2)
+      {
+         float3 x = make_float3(_tex2D(p_TexR, i, j),
+                                _tex2D(p_TexG, i, j),
+                                _tex2D(p_TexB, i, j));
+         const int idx = (int) floorf(perceptual(x)*PANEL_COUNT*ZOOM);
+         if (idx >= 0 && idx < PANEL_COUNT)
+         {
+            R[idx] += x.x;
+            G[idx] += x.y;
+            B[idx] += x.z;
+            SUM[idx] += 1;
+         }
+      }
+    
     if (p_Y < panel_height*(PANEL_SPACING - 1.5f))
       return make_float3(_tex2D(p_TexR, p_X, p_Y),
                          _tex2D(p_TexG, p_X, p_Y),
@@ -107,9 +66,8 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
       if (p_Y < panel_height*(PANEL_SPACING - 1))
       {
          float level = (float) (2*idx+1) / (2*PANEL_COUNT*ZOOM);
-         float3 x = make_float3(level, level, level);
-         (void) acescc_t_inv(COLOR_SPACE, &x);
-         return x;
+         float p = level <= 0.018f ? level * 4.5f : 1.099f *_powf(level,0.45f) - 0.099f;
+         return make_float3(p,p,p);
       }
       else
         if (SUM[idx] >= 1)          
