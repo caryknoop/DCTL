@@ -9,8 +9,8 @@ Shows the color balance by perceptual luminance level as a horizontal stoke on t
 
 Variables:
 ````
-__CONSTANT__ int  ZOOM          = 1; // Increase to ZOOM into the shadows.
-__CONSTANT__ int  SAMPLE        = 32;   // Lower for more accuracy, raise for better performance.
-__CONSTANT__ int  PANEL_COUNT   = 20;   // Defines the number of horizontal panels (25 max or increase arrays)
-__CONSTANT__ int  PANEL_SPACING = 20;   // The larger the number the smaller the height of the panels. 
+__CONSTANT__ int  ZOOM          = 1;  // Increase to ZOOM into the shadows.
+__CONSTANT__ int  SAMPLE        = 32; // Lower for more accuracy, raise for better performance.
+__CONSTANT__ int  PANEL_COUNT   = 20; // The number of horizontal panels (26 max or increase arrays)
+__CONSTANT__ int  PANEL_SPACING = 20; // The larger the number the smaller the height of the panels. 
 ````
