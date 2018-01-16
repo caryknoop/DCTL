@@ -52,7 +52,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
            float3 x = make_float3(_tex2D(p_TexR, i, j),
                                   _tex2D(p_TexG, i, j),
                                   _tex2D(p_TexB, i, j));
-           const int idx = (int) floorf(perceptual(x) * panel_zoom);
+           const int idx = (int) (perceptual(x) * panel_zoom);
            if (idx >= 0 && idx < PANEL_COUNT)
            {
               R[idx] += x.x;
