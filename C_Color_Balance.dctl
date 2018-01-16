@@ -1,11 +1,18 @@
 /* 
  Color Balance
 
- Version 003
+ Version 004
  
  - Use perceptual luminance.
+ - Optimize performance.
  
 ****************************************************************************************/
+
+
+__CONSTANT__ int ZOOM          = 1;   // Increase to ZOOM into the shadows.
+__CONSTANT__ int SAMPLE        = 32;  // Lower for more accuracy, raise for better performance.
+__CONSTANT__ int PANEL_COUNT   = 26;  // Defines the number of horizontal panels (25 max or increase arrays)
+__CONSTANT__ int PANEL_SPACING = 20;  // The larger the number the smaller the height of the panels. 
 
 __DEVICE__ float perceptual(float3 x)
 {
@@ -18,54 +25,47 @@ __DEVICE__ float perceptual(float3 x)
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-    float R[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-    float G[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-    float B[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
-                     0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-    int   SUM[26] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
-    const float ZOOM          = 1.0f;  // Increase to ZOOM into the shadows.
-    const int   SAMPLE        = 32;    // Lower for more accuracy, raise for better performance.
-    const int   PANEL_COUNT   = 26;    // Defines the number of horizontal panels (25 max or increase arrays)
-    const int   PANEL_SPACING = 20;    // The larger the number the smaller the height of the panels. 
-
-    const int   skip         = SAMPLE;
-    const int   skip2        = SAMPLE /2;
-    const float panel_width  = (float) p_Width/PANEL_COUNT;
-    const float panel_height = (float) p_Height/PANEL_SPACING;
-    const float panel_zoom   = PANEL_COUNT/ZOOM;
+    const int panel_width  = (int) p_Width / PANEL_COUNT;
+    const int panel_height = (int) p_Height / PANEL_SPACING;
+    const int panel_zoom   = PANEL_COUNT * ZOOM;
     
-    for (int i = 0; i < p_Width; i+=skip)
-      for (int j = 0; j < p_Height; j+=skip2)
-      {
-         float3 x = make_float3(_tex2D(p_TexR, i, j),
-                                _tex2D(p_TexG, i, j),
-                                _tex2D(p_TexB, i, j));
-         const int idx = (int) floorf(perceptual(x)*PANEL_COUNT*ZOOM);
-         if (idx >= 0 && idx < PANEL_COUNT)
-         {
-            R[idx] += x.x;
-            G[idx] += x.y;
-            B[idx] += x.z;
-            SUM[idx] += 1;
-         }
-      }
-    
-    if (p_Y < panel_height*(PANEL_SPACING - 1.5f))
+    if (p_Y < panel_height * ((float) PANEL_SPACING - 1.5f))
       return make_float3(_tex2D(p_TexR, p_X, p_Y),
                          _tex2D(p_TexG, p_X, p_Y),
                          _tex2D(p_TexB, p_X, p_Y));      
     else 
     {
-      int idx = (int) floorf(p_X / panel_width);
+      float R[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                       0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                       0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+      float G[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                       0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                       0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+      float B[26]   = {0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                       0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,
+                       0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
+      int   SUM[26] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+      
+      for (int i = SAMPLE-1; i < p_Width; i+=SAMPLE)
+        for (int j = (SAMPLE/2)-1; j < p_Height; j+=SAMPLE/2)
+        {
+           float3 x = make_float3(_tex2D(p_TexR, i, j),
+                                  _tex2D(p_TexG, i, j),
+                                  _tex2D(p_TexB, i, j));
+           const int idx = (int) floorf(perceptual(x) * panel_zoom);
+           if (idx >= 0 && idx < PANEL_COUNT)
+           {
+              R[idx] += x.x;
+              G[idx] += x.y;
+              B[idx] += x.z;
+              SUM[idx]++;
+           }
+        }
+
+      int idx = (int) p_X / panel_width;
       if (p_Y < panel_height*(PANEL_SPACING - 1))
       {
-         float level = (float) (2*idx+1) / (2*PANEL_COUNT*ZOOM);
+         float level = (float) (2*idx+1) / (2*panel_zoom);
          float p = level <= 0.018f ? level * 4.5f : 1.099f *_powf(level,0.45f) - 0.099f;
          return make_float3(p,p,p);
       }
