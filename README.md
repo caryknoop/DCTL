@@ -14,3 +14,13 @@ __CONSTANT__ int  SAMPLE        = 16; // Lower for more accuracy, raise for bett
 __CONSTANT__ int  PANEL_COUNT   = 20; // The number of horizontal panels (26 max or increase arrays)
 __CONSTANT__ int  PANEL_SPACING = 20; // The larger the number the smaller the height of the panels. 
 ````
+
+# C_Channel_Viewer
+
+Shows channels in RGB and LAB color spaces.
+
+Variables:
+````
+__CONSTANT__ int LAB = 1;   // Use 0 for RGB and 1 for LAB
+````
+
