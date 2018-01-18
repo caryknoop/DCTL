@@ -1,0 +1,37 @@
+
+/*
+    Channel Viewer
+
+	Version 001
+
+*/
+
+__CONSTANT__ int LAB = 1;   // Use 0 for RGB and 1 for LAB
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+	const int offx = p_X >= p_Width / 2 ? p_Width / 2 : 0;
+	const int offy = p_Y >= p_Height / 2 ? p_Height / 2 : 0;
+	const float offset = LAB == 1 ? 0.5f : 0.0f;
+
+	if (!offx && !offy)
+		return  make_float3(
+			_tex2D(p_TexR, 2*(p_X - offx) + 1, 2*(p_Y - offy) + 1),
+			_tex2D(p_TexG, 2*(p_X - offx) + 1, 2*(p_Y - offy) + 1),
+			_tex2D(p_TexB, 2*(p_X - offx) + 1, 2*(p_Y - offy) + 1));
+	if (offx && !offy)
+		return  make_float3(
+			_tex2D(p_TexR, 2*(p_X - offx) + 1, 2*(p_Y - offy) + 1), 
+			offset, 
+			offset);
+	if (!offx && offy)
+		return  make_float3(
+			offset,
+			_tex2D(p_TexG, 2*(p_X - offx) + 1, 2*(p_Y - offy) + 1), 
+			offset);
+	if (offx && offy)
+		return  make_float3(
+			offset, 
+			offset,
+			_tex2D(p_TexB, 2*(p_X - offx) + 1, 2*(p_Y - offy) + 1));
+}
