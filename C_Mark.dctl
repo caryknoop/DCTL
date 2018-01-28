@@ -1,0 +1,28 @@
+/*
+   C_Mark
+
+   This DCTL works together with C_Analyze, it places information on the bottom 4 lines of the video.  
+   C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
+   
+   Version 001
+   
+*/
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+	float val = (float) p_X / (float) p_Width;
+
+	if (p_Y < p_Height - 4)
+		return  make_float3(
+			_tex2D(p_TexR, p_X, p_Y),
+			_tex2D(p_TexG, p_X, p_Y),
+			_tex2D(p_TexB, p_X, p_Y));
+	else if (p_Y == p_Height - 4)
+		return  make_float3(val, val, val);
+	else if (p_Y == p_Height - 3)
+		return  make_float3(val, 0.0f, 0.0f);
+	else if (p_Y == p_Height - 2)
+		return  make_float3(0.0f, val, 0.0f);
+	else
+		return  make_float3(0.0f, 0.0f, val);
+}
