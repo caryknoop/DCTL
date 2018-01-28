@@ -5,7 +5,7 @@
    C_Analyze describes the channel independent changes made between the C_Mark and the C_Analyze nodes.
    
    Version 001
-   
+    
 */
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
