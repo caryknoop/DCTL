@@ -6,6 +6,8 @@ C_Analyze
 This DCTL works togeher with C_Mark.  C_Mark places information on the bottom 4 lines of the video.
 C_Analyzes describes the changes made between the C_Mark and C_Analyze nodes.
 
+Bug: small line at the bottom of the first panel.
+
 Version 004
 
 */
@@ -24,10 +26,10 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
 
 	// else
 
-	float xval = (float)(p_X - 0.75f*p_Width) * 4;
-	float pre = (float)xval / p_Width;
-	float pos = (p_Y + 1) / (p_Height / 4.0f);
-	float scope = 1 - (pos - (int)pos);
+	float xval  = (float) 4*(p_X - 0.75f*p_Width);
+	float pre   = (float) xval / p_Width;
+	float pos   = (float) (p_Y - 1) / (p_Height / 4.0f);    
+	float scope = (float) 1.0f - (pos - (int)pos);
 
 	int   raise = (p_Y < p_Height / 4);
 	float post = (
