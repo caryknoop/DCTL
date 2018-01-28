@@ -2,7 +2,7 @@
    C_Mark
 
    This DCTL works together with C_Analyze, it places information on the bottom 4 lines of the video.  
-   C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
+   C_Analyze describes the channel independent changes made between the C_Mark and the C_Analyze nodes.
    
    Version 001
    
