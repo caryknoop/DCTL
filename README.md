@@ -3,6 +3,14 @@ DaVinci Resolve DCTL files
 
 A collection of DCTL files that may be useful.
 
+# C_Mark
+This DCTL works together with C_Analyze, it places information on the bottom 4 lines of the video.  
+C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
+
+# C_Analyze
+This DCTL works togeher with C_Mark.  C_Mark places information on the bottom 4 lines of the video.
+C_Analyzes describes the changes made between the C_Mark and C_Analyze nodes.
+
 # C_Color_Balance
 
 Shows the color balance by perceptual luminance level as a horizontal stoke on the bottom of the screen. Shows alternating stripes when a particulat luminance level is absent.
