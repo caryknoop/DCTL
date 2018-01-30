@@ -1,28 +1,46 @@
 /*
-   C_Mark
+C_Mark
 
-   This DCTL works together with C_Analyze, it places information on the bottom 4 lines of the video.  
-   C_Analyze describes the channel independent changes made between the C_Mark and the C_Analyze nodes.
-   
-   Version 001
-    
+This DCTL works together with C_Analyze, it places information on top line and the bottom left corner of the video.
+C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
+
+Version 003
+
 */
+
+__CONSTANT__ int LEVEL = 8;   // Must match the level in C_Analyze.
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-	float val = (float) p_X / (float) p_Width;
+	int width = LEVEL*LEVEL;
+	int height = p_Height - LEVEL;
+	float3 p;
 
-	if (p_Y < p_Height - 4)
+	if (p_Y == 0)
+	{
+    	p.x = (float) p_X / p_Width;
+    	p.y = (float) p_X / p_Width;
+    	p.z = (float) p_X / p_Width;
+		return p;
+	}
+	if (p_Y < height)
 		return  make_float3(
 			_tex2D(p_TexR, p_X, p_Y),
 			_tex2D(p_TexG, p_X, p_Y),
 			_tex2D(p_TexB, p_X, p_Y));
-	else if (p_Y == p_Height - 4)
-		return  make_float3(val, val, val);
-	else if (p_Y == p_Height - 3)
-		return  make_float3(val, 0.0f, 0.0f);
-	else if (p_Y == p_Height - 2)
-		return  make_float3(0.0f, val, 0.0f);
-	else
-		return  make_float3(0.0f, 0.0f, val);
+	if (p_X > width)
+	{
+		return  make_float3(
+			_tex2D(p_TexR, p_X, p_Y),
+			_tex2D(p_TexG, p_X, p_Y),
+			_tex2D(p_TexB, p_X, p_Y));
+	}
+
+	float sample = (float)1 / LEVEL;
+
+	p.x = sample*(p_Y - height);
+	p.y = sample* _fmod(p_X, LEVEL);
+	p.z = sample* (p_X / LEVEL);
+
+	return p;
 }
