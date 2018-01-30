@@ -2,75 +2,60 @@
 /*
 C_Analyze
 
+This DCTL works togeher with C_Mark.  C_Mark places information on the top line and bottom left corner of the video.
+C_Analyzes describes the changes made between the C_Mark and C_Analyze nodes.
 
-This DCTL works togeher with C_Mark.  C_Mark places information on the bottom 4 lines of the video.
-C_Analyzes describes the channel independent changes made between the C_Mark and C_Analyze nodes.
-
-Bug: small line at the bottom of the first panel.
-
-Version 004
+Version 006
 
 */
 
+__CONSTANT__ int LEVEL = 8;   // Must match the leves for C_Mark
+__CONSTANT__ int PANELS = 5;
+
+__DEVICE__ float3 getcomputed(int x, int y)
+{
+	float3 p;
+
+	float sample = (float)1 / LEVEL;
+
+	p.x = sample*y;
+	p.y = sample* _fmod(x, LEVEL);
+	p.z = sample* (x / LEVEL);
+	return p;
+}
+
+
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-	float3 p = make_float3(
-		_tex2D(p_TexR, p_X, p_Y),
-		_tex2D(p_TexG, p_X, p_Y),
-		_tex2D(p_TexB, p_X, p_Y));
+	float base = (float)p_Height / PANELS;
 
 	if (p_X < 0.75f * p_Width)
-		return  p;
-	if (!(p_Y % (int)(p_Height / 40)))
+		return  make_float3(
+            _tex2D(p_TexR, p_X, p_Y),
+            _tex2D(p_TexG, p_X, p_Y),
+            _tex2D(p_TexB, p_X, p_Y));
+
+	if (!(p_Y % (int)(p_Height / 40)) && p_Y < base)
 		return  make_float3(0.25, 0.25, 0.25);
 
-	// else
+	float xval = (float)4 * (p_X - 0.75f*p_Width);
+	float val = xval / p_Width;
+	float pos = (p_Y - 1) / base;
+	float scope = 1 - (pos - (int)pos);
 
-	float xval  = (float) 4*(p_X - 0.75f*p_Width);
-	float pre   = (float) xval / p_Width;
-	float pos   = (float) (p_Y - 1) / (p_Height / 4.0f);    
-	float scope = (float) 1.0f - (pos - (int)pos);
-
-	int   raise = (p_Y < p_Height / 4);
-	float post = (
-		_tex2D(p_TexR, xval, p_Height - 4) +
-		_tex2D(p_TexG, xval, p_Height - 4) +
-		_tex2D(p_TexB, xval, p_Height - 4)) / 3;
-	float val = (post - pre) + 0.5f;
-
-	if (p_Y < 2 * p_Height / 4)
+	if (p_Y < base)
 	{
-		if (raise)
-			val += pre - 0.5f;
-		if (val >= scope - 0.005 && val <= scope + 0.005)
-			return  make_float3(1, 1, 1);
-		else if (raise)
-			return  make_float3(
-			(0.1f + p.x) / 2,
-				(0.1f + p.y) / 2,
-				(0.1f + p.z) / 2);
-		else
-			return  make_float3(
-			(0.2f + p.x) / 2,
-				(0.2f + p.y) / 2,
-				(0.2f + p.z) / 2);
-	}
-	else
-	{
-		raise = (p_Y < 3 * p_Height / 4);
-		float postR = _tex2D(p_TexR, xval, p_Height - 3);
-		float valR = (float)(postR - pre) + 0.5f;
-		float postG = _tex2D(p_TexG, xval, p_Height - 2);
-		float valG = (float)(postG - pre) + 0.5f;
-		float postB = _tex2D(p_TexB, xval, p_Height - 1);
-		float valB = (float)(postB - pre) + 0.5f;
+		float postR = _tex2D(p_TexR, xval, 0);
+		float valR = (postR - val + 0.5);
+		float postG = _tex2D(p_TexG, xval, 0);
+		float valG = (postG - val + 0.5);
+		float postB = _tex2D(p_TexB, xval, 0);
+		float valB = (postB - val + 0.5);
 
-		if (raise)
-		{
-			valR += pre - 0.5f;
-			valB += pre - 0.5f;
-			valG += pre - 0.5f;
-		}
+		valR += val - 0.5;
+		valB += val - 0.5;
+		valG += val - 0.5;
+
 		if (valR >= scope - 0.005 && valR <= scope + 0.005)
 			return  make_float3(1, (postR == postG) ? 1 : 0, (postR == postB) ? 1 : 0);
 		if (valG >= scope - 0.005 && valG <= scope + 0.005)
@@ -78,9 +63,39 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
 		if (valB >= scope - 0.005 && valB <= scope + 0.005)
 			return  make_float3((postB == postR) ? 1 : 0, (postB == postG) ? 1 : 0, 1);
 		else
+			return  make_float3(0.5, 0.5, 0.5);
+	}
+
+	if (p_Y < 1.25 * base)
+		return  make_float3(
+			_tex2D(p_TexR, xval, 0),
+			_tex2D(p_TexG, xval, 0),
+			_tex2D(p_TexB, xval, 0));
+	if (p_Y == (int) (1.25 * base))
+     	return  make_float3(0.5, 0.5, 0.5);
+	if (p_Y < 1.5* base)
+		return  make_float3(val, val, val);
+
+	float level = 0;
+	int   zoom = (float)LEVEL*LEVEL / p_Width * xval;
+	float line = 1.7;
+
+	for (int i = 0; i<8; i++)
+	{
+		if (p_Y < line* base)
+			return  make_float3(0.5, 0.5, 0.5);
+		line += 0.16;
+		if (p_Y < line* base)
 			return  make_float3(
-			(( (raise) ? 0.1f : 0.2f) + p.x) / 2,
-			(( (raise) ? 0.1f : 0.2f) + p.y) / 2,
-			(( (raise) ? 0.1f : 0.2f) + p.z) / 2);
+				_tex2D(p_TexR, zoom, p_Height - level -1),
+				_tex2D(p_TexG, zoom, p_Height - level -1),
+				_tex2D(p_TexB, zoom, p_Height - level -1));
+		line += 0.16;
+		if (p_Y < line* base)
+			return getcomputed(zoom, LEVEL - level - 1);
+		line += 0.08;
+		if (p_Y < line* base)
+			return  make_float3(0.5, 0.5, 0.5);
+		level += 0.125*LEVEL;
 	}
 }
