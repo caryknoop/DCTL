@@ -1,7 +1,5 @@
 # DCTL
-DaVinci Resolve DCTL files
-
-A collection of DCTL files that may be useful.
+A collection of DaVinci Resolve DCTL files that may be useful.
 
 # C_Mark
 This DCTL works together with C_Analyze, it places information on the video.  
