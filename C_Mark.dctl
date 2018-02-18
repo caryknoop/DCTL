@@ -4,43 +4,74 @@ C_Mark
 This DCTL works together with C_Analyze, it places information on top line and the bottom left corner of the video.
 C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
 
-Version 003
+Version 004
+
 
 */
 
-__CONSTANT__ int LEVEL = 8;   // Must match the level in C_Analyze.
+__CONSTANT__ int LEVEL = 12;  
+
+__DEVICE__ inline float h2r(float v1, float v2, float h)
+{
+	if (h < 0)
+		h += 1;
+	if (h > 1)
+		h -= 1;
+	if (6 * h < 1)
+		return v1 + (v2 - v1) * 6 * h;
+	if (2 * h < 1)
+		return v2;
+	if (3 * h < 2)
+		return v1 + (v2 - v1) * (2 / 3.0f - h) * 6;
+	return v1;
+}
 
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-	int width = LEVEL*LEVEL;
-	int height = p_Height - LEVEL;
-	float3 p;
+	struct hsl {
+		float h;
+		float s;
+		float l;
+	};
 
-	if (p_Y == 0)
+	float3 p;
+	hsl g;
+
+	//	if (p_Y == p_Height - 1)
+	if (p_Y >= p_Height - 8 && p_X < LEVEL*LEVEL*LEVEL)
 	{
-    	p.x = (float) p_X / p_Width;
-    	p.y = (float) p_X / p_Width;
-    	p.z = (float) p_X / p_Width;
+		float sample = (float)1 / LEVEL;
+
+		// Generate HSL model 
+		g.h = _fmod(p_X, LEVEL)/ LEVEL;
+		g.l = _fmod(p_X/3/LEVEL, LEVEL) / LEVEL;
+		g.s = _fmod(p_X/(LEVEL*LEVEL), LEVEL) / LEVEL;
+
+        // Limit the range
+        g.l = g.l*0.6 + 0.2;
+        g.s = g.s*0.7 + 0.15;
+        
+		if (g.s == 0)
+			p.x = p.y = p.z = g.l;
+		else
+		{ 
+			float v2 = g.l < 0.5 ? g.l*(1 + g.s) : (g.l + g.s) - (g.s*g.l);
+			float v1 = 2 * g.l - v2;
+
+			p.x = h2r(v1, v2, g.h + 1 / 3.0f);
+			p.y = h2r(v1, v2, g.h);
+			p.z = h2r(v1, v2, g.h - 1 / 3.0f);
+		}
 		return p;
 	}
-	if (p_Y < height)
-		return  make_float3(
-			_tex2D(p_TexR, p_X, p_Y),
-			_tex2D(p_TexG, p_X, p_Y),
-			_tex2D(p_TexB, p_X, p_Y));
-	if (p_X > width)
+	if (p_Y == 0)
 	{
-		return  make_float3(
-			_tex2D(p_TexR, p_X, p_Y),
-			_tex2D(p_TexG, p_X, p_Y),
-			_tex2D(p_TexB, p_X, p_Y));
+		p.x = p.y = p.z = (float)p_X / p_Width;
+		return p;
 	}
 
-	float sample = (float)1 / LEVEL;
-
-	p.x = sample*(p_Y - height);
-	p.y = sample* _fmod(p_X, LEVEL);
-	p.z = sample* (p_X / LEVEL);
-
-	return p;
+	return  make_float3(
+		_tex2D(p_TexR, p_X, p_Y),
+		_tex2D(p_TexG, p_X, p_Y),
+		_tex2D(p_TexB, p_X, p_Y));
 }
