@@ -5,17 +5,9 @@ A collection of DaVinci Resolve DCTL files that may be useful.
 This DCTL works together with C_Analyze, it places information on the video.  
 C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
 
-`````
-__CONSTANT__ int LEVEL = 8;   // Must match the level in C_Analyze.
-`````
-
 # C_Analyze
 This DCTL works togeher with C_Mark.  C_Mark places information on the video.
 C_Analyzes describes the changes made between the C_Mark and C_Analyze nodes.
-
-`````
-__CONSTANT__ int LEVEL = 8;   // Must match the level in C_Analyze.
-`````
 
 # C_Color_Balance
 
