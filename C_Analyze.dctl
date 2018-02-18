@@ -5,97 +5,129 @@ C_Analyze
 This DCTL works togeher with C_Mark.  C_Mark places information on the top line and bottom left corner of the video.
 C_Analyzes describes the changes made between the C_Mark and C_Analyze nodes.
 
-Version 006
+Version 010
+
+ToDo
+- Rec2100 support
+- Optimize code
 
 */
 
-__CONSTANT__ int LEVEL = 8;   // Must match the leves for C_Mark
-__CONSTANT__ int PANELS = 5;
+__CONSTANT__ int LEVEL = 12;  
 
-__DEVICE__ float3 getcomputed(int x, int y)
+__DEVICE__ inline float h2r(float v1, float v2, float h)
 {
-	float3 p;
+	if (h < 0)
+		h += 1;
+	if (h > 1)
+		h -= 1;
+	if (6 * h < 1)
+		return v1 + (v2 - v1) * 6 * h;
+	if (2 * h < 1)
+		return v2;
+	if (3 * h < 2)
+		return v1 + (v2 - v1) * (2 / 3.0f - h) * 6;
+	return v1;
+}
 
-	float sample = (float)1 / LEVEL;
+__DEVICE__ float3 compute(int p_X, int p_Y)
+{
+	struct hsl {
+		float h;
+		float s;
+		float l;
+	};
 
-	p.x = sample*y;
-	p.y = sample* _fmod(x, LEVEL);
-	p.z = sample* (x / LEVEL);
+	struct float3 p;
+	hsl g;
+
+	// Generate HSL model 
+	g.h = _fmod(p_X, LEVEL) / LEVEL;
+	g.l = _fmod(p_Y / 3 / LEVEL, LEVEL) / LEVEL;
+	g.s = _fmod(p_Y / (LEVEL*LEVEL), LEVEL) / LEVEL;
+
+	// Limit the range
+	g.l = g.l*0.6 + 0.2;
+	g.s = g.s*0.7 + 0.15;
+
+	if (g.s == 0)
+		p.x = p.y = p.z = g.l;
+	else
+	{
+		float v2 = g.l < 0.5 ? g.l*(1 + g.s) : (g.l + g.s) - (g.s*g.l);
+		float v1 = 2 * g.l - v2;
+
+		p.x = h2r(v1, v2, g.h + 1 / 3.0f);
+		p.y = h2r(v1, v2, g.h);
+		p.z = h2r(v1, v2, g.h - 1 / 3.0f);
+	}
 	return p;
 }
 
-
 __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
 {
-	float base = (float)p_Height / PANELS;
+	const int right = p_X >= p_Width / 2 ? p_Width / 2 : 0;
+	const int bottom = p_Y >= p_Height / 2 ? p_Height / 2 : 0;
 
-	if (p_X < 0.75f * p_Width)
+	if (!right && !bottom)
 		return  make_float3(
-            _tex2D(p_TexR, p_X, p_Y),
-            _tex2D(p_TexG, p_X, p_Y),
-            _tex2D(p_TexB, p_X, p_Y));
-
-	if (!(p_Y % (int)(p_Height / 40)) && p_Y < base)
-		return  make_float3(0.25, 0.25, 0.25);
-
-	float xval = (float)4 * (p_X - 0.75f*p_Width);
-	float val = xval / p_Width;
-	float pos = (p_Y - 1) / base;
-	float scope = 1 - (pos - (int)pos);
-
-	if (p_Y < base)
+			_tex2D(p_TexR, 2 * (p_X - right), 2 * (p_Y - bottom)),
+			_tex2D(p_TexG, 2 * (p_X - right), 2 * (p_Y - bottom)),
+			_tex2D(p_TexB, 2 * (p_X - right), 2 * (p_Y - bottom)));
+	if (!right)
 	{
+		float xval = p_X * 2;
+		float val = xval / p_Width;
+
+		float d = 0.002;
+
+		// Scope
+		if (!(p_Y % (p_Height / 20)))
+			return  make_float3(0.3, 0.6, 0.7);
+
+		float scope = 1 - (p_Y + 1 - p_Height / 2.0f) / (p_Height / 2.0f);
 		float postR = _tex2D(p_TexR, xval, 0);
-		float valR = (postR - val + 0.5);
 		float postG = _tex2D(p_TexG, xval, 0);
-		float valG = (postG - val + 0.5);
 		float postB = _tex2D(p_TexB, xval, 0);
-		float valB = (postB - val + 0.5);
 
-		valR += val - 0.5;
-		valB += val - 0.5;
-		valG += val - 0.5;
+		// Relative luminance
+		float lumR = postR <= 0.081f ? postR / 4.5f : _powf((postR + 0.099f) / 1.099f, 1.0f / 0.45f);
+		float lumG = postG <= 0.081f ? postG / 4.5f : _powf((postG + 0.099f) / 1.099f, 1.0f / 0.45f);
+		float lumB = postB <= 0.081f ? postB / 4.5f : _powf((postB + 0.099f) / 1.099f, 1.0f / 0.45f);
 
-		if (valR >= scope - 0.005 && valR <= scope + 0.005)
-			return  make_float3(1, (postR == postG) ? 1 : 0, (postR == postB) ? 1 : 0);
-		if (valG >= scope - 0.005 && valG <= scope + 0.005)
-			return  make_float3((postG == postR) ? 1 : 0, 1, (postG == postB) ? 1 : 0);
-		if (valB >= scope - 0.005 && valB <= scope + 0.005)
-			return  make_float3((postB == postR) ? 1 : 0, (postB == postG) ? 1 : 0, 1);
+		float luminance = lumR * 0.2126f + lumG * 0.7152f + lumB * 0.0722f;
+		if (luminance >= scope - d && luminance <= scope + d && !(p_X % 4))
+			return  make_float3(1, 1, 1);
+
+		// Green first for tinting the overlappings
+		if (postG >= scope - d && postG <= scope + d)
+			return  make_float3((postG == postR) ? 0.9 : 0, 1, (postG == postB) ? 0.9 : 0);
+		if (postR >= scope - d && postR <= scope + d)
+			return  make_float3(1, (postR == postG) ? 0.9 : 0, (postR == postB) ? 0.9 : 0);
+		if (postB >= scope - d && postB <= scope + d)
+			return  make_float3((postB == postR) ? 0.9 : 0, (postB == postG) ? 0.9 : 0, 1);
 		else
-			return  make_float3(0.5, 0.5, 0.5);
-	}
-
-	if (p_Y < 1.25 * base)
-		return  make_float3(
-			_tex2D(p_TexR, xval, 0),
-			_tex2D(p_TexG, xval, 0),
-			_tex2D(p_TexB, xval, 0));
-	if (p_Y == (int) (1.25 * base))
-     	return  make_float3(0.5, 0.5, 0.5);
-	if (p_Y < 1.5* base)
-		return  make_float3(val, val, val);
-
-	float level = 0;
-	int   zoom = (float)LEVEL*LEVEL / p_Width * xval;
-	float line = 1.7;
-
-	for (int i = 0; i<8; i++)
-	{
-		if (p_Y < line* base)
-			return  make_float3(0.5, 0.5, 0.5);
-		line += 0.16;
-		if (p_Y < line* base)
 			return  make_float3(
-				_tex2D(p_TexR, zoom, p_Height - level -1),
-				_tex2D(p_TexG, zoom, p_Height - level -1),
-				_tex2D(p_TexB, zoom, p_Height - level -1));
-		line += 0.16;
-		if (p_Y < line* base)
-			return getcomputed(zoom, LEVEL - level - 1);
-		line += 0.08;
-		if (p_Y < line* base)
-			return  make_float3(0.5, 0.5, 0.5);
-		level += 0.125*LEVEL;
+				_tex2D(p_TexR, xval, 0),
+				_tex2D(p_TexG, xval, 0),
+				_tex2D(p_TexB, xval, 0));
+	}
+	if (right)
+	{
+
+    	int p_Xs = ((p_X - right) / (right / LEVEL));
+		int p_Ys = (p_Y / (p_Height / (LEVEL*LEVEL)));
+		if ((float) p_X / (right / LEVEL) - (p_X / (right / LEVEL)) > 0.5f)
+			return compute(p_Xs, (int) (LEVEL*LEVEL*LEVEL / (float) p_Height * p_Y));
+		else
+		{
+			// Scale the X and Y values      
+			int height = p_Ys*LEVEL;
+			int x = height + p_Xs;
+			return  make_float3(
+				_tex2D(p_TexR, x, p_Height - 1),
+				_tex2D(p_TexG, x, p_Height - 1),
+				_tex2D(p_TexB, x, p_Height - 1));
+		}
 	}
 }
