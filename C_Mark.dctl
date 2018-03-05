@@ -4,7 +4,7 @@ C_Mark
 This DCTL works together with C_Analyze, it places information on top line and the bottom left corner of the video.
 C_Analyze describes the changes made between the C_Mark and the C_Analyze nodes.
 
-Version 004
+Version 005
 
 
 */
@@ -34,17 +34,17 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
 		float l;
 	};
 
+    const int segment = LEVEL / 4;
+    
 	float3 p;
 	hsl g;
-
+    
 	//	if (p_Y == p_Height - 1)
 	if (p_Y >= p_Height - 8 && p_X < LEVEL*LEVEL*LEVEL)
 	{
-		float sample = (float)1 / LEVEL;
-
 		// Generate HSL model 
 		g.h = _fmod(p_X, LEVEL)/ LEVEL;
-		g.l = _fmod(p_X/3/LEVEL, LEVEL) / LEVEL;
+		g.l = _fmod(p_X/segment/LEVEL, LEVEL) / LEVEL;
 		g.s = _fmod(p_X/(LEVEL*LEVEL), LEVEL) / LEVEL;
 
         // Limit the range
