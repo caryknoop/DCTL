@@ -39,8 +39,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
 	float3 p;
 	hsl g;
     
-	//	if (p_Y == p_Height - 1)
-	if (p_Y >= p_Height - 8 && p_X < LEVEL*LEVEL*LEVEL)
+	if (p_Y >= p_Height - 1 && p_X < LEVEL*LEVEL*LEVEL)
 	{
 		// Generate HSL model 
 		g.h = _fmod(p_X, LEVEL)/ LEVEL;
