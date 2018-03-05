@@ -13,7 +13,8 @@ ToDo
 
 */
 
-__CONSTANT__ int LEVEL = 12;  
+__CONSTANT__ int LEVEL = 12; 
+__CONSTANT__ int PERCEPTUAL_CURVE = 0; 
 
 __DEVICE__ inline float h2r(float v1, float v2, float h)
 {
@@ -96,7 +97,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
 		float lumB = postB <= 0.081f ? postB / 4.5f : _powf((postB + 0.099f) / 1.099f, 1.0f / 0.45f);
 
 		float luminance = lumR * 0.2126f + lumG * 0.7152f + lumB * 0.0722f;
-		if (luminance >= scope - d && luminance <= scope + d && !(p_X % 4))
+		if (PERCEPTUAL_CURVE && luminance >= scope - d && luminance <= scope + d && !(p_X % 4))
 			return  make_float3(1, 1, 1);
 
 		// Green first for tinting the overlappings
