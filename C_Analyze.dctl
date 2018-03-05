@@ -116,7 +116,7 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTU
 	{
 
     	int p_Xs = ((p_X - right) / (right / LEVEL));
-		int p_Ys = (p_Y / (p_Height / (LEVEL*LEVEL)));
+		int p_Ys = (p_Y / ((float) p_Height / (LEVEL*LEVEL)));
 		if ((float) p_X / (right / LEVEL) - (p_X / (right / LEVEL)) > 0.5f)
 			return compute(p_Xs, (int) (LEVEL*LEVEL*LEVEL / (float) p_Height * p_Y));
 		else
