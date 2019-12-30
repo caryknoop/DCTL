@@ -1,0 +1,57 @@
+/*
+  Smooth rolloff
+*/
+DEFINE_UI_PARAMS(p_max,      Max,         DCTLUI_SLIDER_FLOAT,  1.0f,  1.3f, 0.6f, 0.01f)
+DEFINE_UI_PARAMS(p_max_r,    Max Range,   DCTLUI_SLIDER_FLOAT,  0.2f,  0.0f, 0.4f, 0.01f)
+DEFINE_UI_PARAMS(p_min,      Min,         DCTLUI_SLIDER_FLOAT, -0.0f, -0.3f, 0.4f, 0.01f)
+DEFINE_UI_PARAMS(p_min_r,    Min Range,   DCTLUI_SLIDER_FLOAT,  0.2f,  0.0f, 0.4f, 0.01f)
+DEFINE_UI_PARAMS(p_depth,    Depth,       DCTLUI_SLIDER_FLOAT,  1.0f,  0.1f, 2.0f, 0.01f)
+
+__DEVICE__ inline float depth (float p, float t)
+{
+    if (t != 1.0f)
+      return  _powf(p, t);
+    else 
+      return p;
+}
+
+__DEVICE__ inline float rolloff (float p, float max, float max_r)
+{
+  if (p <= max - max_r)
+    return p;
+  else if (p >= max + max_r)
+    return max;
+  else
+    return -1/(4*max_r)*(p*p - 2*(max + max_r)*p + (max - max_r)*(max - max_r));
+}
+
+__DEVICE__ inline float split (float p, float max, float max_r, float min, float min_r, float t)
+{
+   float p2;
+   if (p >= 0.5f)
+   {
+      p2 = depth(p, 1.0f/t);
+      p2 = rolloff(p2, max, max_r);
+      p2 = depth(p2, t);
+   }
+   else 
+   {
+      p2 = skew(1.0f - p, 1.0f/t);
+      p2 = rolloff(p2, 1.0f - min, min_r);
+      p2 = skew(p2, t);
+      p2 = 1.0f - p2;
+   }
+   return p2;
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+   float3 p = make_float3(
+                     _tex2D(p_TexR, p_X, p_Y),
+                     _tex2D(p_TexG, p_X, p_Y),
+                     _tex2D(p_TexB, p_X, p_Y));
+   p.x = split(p.x, p_max, p_max_r, p_min, p_min_r, p_depth);
+   p.y = split(p.y, p_max, p_max_r, p_min, p_min_r, p_depth);
+   p.z = split(p.z, p_max, p_max_r, p_min, p_min_r, p_depth);
+   return p;
+}
