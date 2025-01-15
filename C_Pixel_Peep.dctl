@@ -1,0 +1,122 @@
+DEFINE_DCTL_ALPHA_MODE_STRAIGHT
+DEFINE_UI_PARAMS(xPos, X Position, DCTLUI_SLIDER_INT, 1920, 0, 4096, 1)
+DEFINE_UI_PARAMS(yPos, Y Position, DCTLUI_SLIDER_INT, 1080, 0, 2160, 1)
+
+__DEVICE__ bool drawBar(int x, int y, int posX, int posY, int width, int height) {
+    return (x >= posX && x < posX + width && y >= posY && y < posY + height);
+}
+
+__DEVICE__ bool drawDecimalPoint(int x, int y, int posX, int posY, int digitHeight, int digitWidth) {
+    int dotSize = digitWidth / 6;
+    int adjustedPosY = posY + digitHeight - dotSize;
+    return (x >= posX && x < posX + dotSize &&
+            y >= adjustedPosY && y < adjustedPosY + dotSize);
+}
+
+__DEVICE__ bool drawSegment(int x, int y, int posX, int posY, int digitWidth, int digitHeight, int segment) {
+    const float barWidthRatio = 0.15f;
+    const float barHeightRatio = 0.05f;
+
+    int barWidth = (int)(digitWidth * barWidthRatio);
+    int barHeight = (int)(digitHeight * barHeightRatio);
+
+    switch (segment) {
+        case 0: return (x >= posX + barWidth && x < posX + digitWidth - barWidth && y >= posY && y < posY + barHeight);  // Top
+        case 1: return (x >= posX + digitWidth - barWidth && x < posX + digitWidth && y >= posY + barHeight && y < posY + digitHeight / 2);  // Top-right
+        case 2: return (x >= posX + digitWidth - barWidth && x < posX + digitWidth && y >= posY + digitHeight / 2 && y < posY + digitHeight - barHeight);  // Bottom-right
+        case 3: return (x >= posX + barWidth && x < posX + digitWidth - barWidth && y >= posY + digitHeight - barHeight && y < posY + digitHeight);  // Bottom
+        case 4: return (x >= posX && x < posX + barWidth && y >= posY + digitHeight / 2 && y < posY + digitHeight - barHeight);  // Bottom-left
+        case 5: return (x >= posX && x < posX + barWidth && y >= posY + barHeight && y < posY + digitHeight / 2);  // Top-left
+        case 6: return (x >= posX + barWidth && x < posX + digitWidth - barWidth && y >= posY + digitHeight / 2 - barHeight / 2 && y < posY + digitHeight / 2 + barHeight / 2);  // Middle
+    }
+    return false;
+}
+
+__DEVICE__ bool drawDigit(int digit, int x, int y, int posX, int posY, int digitWidth, int digitHeight) {
+    const bool segments[10][7] = {
+        {1, 1, 1, 1, 1, 1, 0},  // 0
+        {0, 1, 1, 0, 0, 0, 0},  // 1
+        {1, 1, 0, 1, 1, 0, 1},  // 2
+        {1, 1, 1, 1, 0, 0, 1},  // 3
+        {0, 1, 1, 0, 0, 1, 1},  // 4
+        {1, 0, 1, 1, 0, 1, 1},  // 5
+        {1, 0, 1, 1, 1, 1, 1},  // 6
+        {1, 1, 1, 0, 0, 0, 0},  // 7
+        {1, 1, 1, 1, 1, 1, 1},  // 8
+        {1, 1, 1, 1, 0, 1, 1}   // 9
+    };
+
+    bool isLit = false;
+    for (int i = 0; i < 7; i++) {
+        if (segments[digit][i]) {
+            isLit |= drawSegment(x, y, posX, posY, digitWidth, digitHeight, i);
+        }
+    }
+    return isLit;
+}
+
+__DEVICE__ float4 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB, __TEXTURE__ p_TexA) {
+    float4 output = make_float4(0.0f, 0.0f, 0.0f, 1.0f);
+
+    // Sample values for each channel
+    int sampleX = xPos >= p_Width ? p_Width - 1 : xPos;
+    int sampleY = yPos >= p_Height ? p_Height - 1 : yPos;
+    float values[4] = {
+        _tex2D(p_TexR, sampleX, sampleY),  // Red
+        _tex2D(p_TexG, sampleX, sampleY),  // Green
+        _tex2D(p_TexB, sampleX, sampleY),  // Blue
+        _tex2D(p_TexA, sampleX, sampleY)   // Alpha
+    };
+
+    // Colors for each row
+    float4 colors[4] = {
+        make_float4(0.8f, 0.1f, 0.1f, 1.0f),  // Red for R
+        make_float4(0.1f, 0.8f, 0.1f, 1.0f),  // Green for G
+        make_float4(0.1f, 0.1f, 0.8f, 1.0f),  // Blue for B
+        make_float4(0.8f, 0.8f, 0.8f, 1.0f)   // White for Alpha
+    };
+
+    int digitHeight = p_Height / 15;
+    int digitWidth = (int)(digitHeight * 0.6f);
+    int spacing = digitWidth / 4;
+    int totalWidth = digitWidth * 6 + spacing * 7;
+    int startX = (p_Width - totalWidth) / 2;
+
+    for (int i = 0; i < 4; i++) {
+        int startY = (p_Height / 5) * (i + 1);  // Vertical position for each row
+        int displayValue = (int)(values[i] * 100000.0f + 0.5f);
+        int pos = startX;
+
+        bool isLit = false;
+
+        // Integer part
+        int intPart = displayValue / 100000;
+        if (drawDigit(intPart, p_X, p_Y, pos, startY, digitWidth, digitHeight)) isLit = true;
+        pos += digitWidth + spacing;
+
+        // Decimal point
+        if (drawDecimalPoint(p_X, p_Y, pos, startY, digitHeight, digitWidth)) isLit = true;
+        pos += spacing;
+
+        // Decimal digits
+        int digits[5] = {
+            (displayValue / 10000) % 10,
+            (displayValue / 1000) % 10,
+            (displayValue / 100) % 10,
+            (displayValue / 10) % 10,
+            displayValue % 10
+        };
+
+        for (int j = 0; j < 5; j++) {
+            if (drawDigit(digits[j], p_X, p_Y, pos, startY, digitWidth, digitHeight)) isLit = true;
+            pos += digitWidth + spacing;
+        }
+
+        // Set the color for the current row if any part is lit
+        if (isLit) {
+            output = colors[i];  // Use the corresponding color for the channel
+        }
+    }
+
+    return output;
+}
